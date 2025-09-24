@@ -1,0 +1,162 @@
+## CrewStay MVP - Construction Worker Housing Management
+
+### Simplified MVP Scope
+
+Create a **minimal viable product** focused purely on seamless communication and coordination between construction companies and hotels for worker accommodation management - **no payment processing, just operational coordination**.
+
+### Core MVP Features
+
+#### **1. Basic User Management**
+- **Two User Types Only:**
+  - Construction Company Admin
+  - Hotel Partner Admin
+- Simple email/password authentication
+- Company/Hotel profile setup with basic contact information
+
+#### **2. Worker Management (Construction Company Side)**
+```
+CORE FUNCTIONS:
+- Add Worker: Name, Phone, ID Number, Expected Stay Duration
+- System generates unique Worker ID: CWS-[COMPANY]-[NUMBER]
+- View All Workers: Active/Inactive status
+- Remove Worker: Mark as discontinued
+- Worker List Export (CSV)
+```
+
+#### **3. Room Assignment (Hotel Side)**
+```
+CORE FUNCTIONS:
+- View Incoming Worker Requests
+- Assign Room Number to Worker
+- Accept/Reject Worker Accommodation
+- View Current Occupants List
+- Update Room Status (Check-in/Check-out)
+```
+
+#### **4. Real-time Updates System**
+```
+AUTOMATIC UPDATES:
+- Worker added by company → Hotel sees new request
+- Hotel assigns room → Company sees room number instantly  
+- Worker discontinued → Hotel notified to update records
+- Extension requested → Hotel gets notification to approve/reject
+```
+
+#### **5. Extension Management**
+```
+COMPANY ACTIONS:
+- Select worker(s) for extension
+- Choose new end date
+- Submit extension request
+
+HOTEL ACTIONS:  
+- View extension requests
+- Accept/Reject with one click
+- Add notes/reasons if rejecting
+```
+
+### MVP User Interface Flow
+
+#### **Construction Company Dashboard:**
+```
+MAIN VIEW:
+┌─────────────────────────────────────┐
+│ CrewStay - [Company Name]           │
+├─────────────────────────────────────┤
+│ [+ Add Worker] [Bulk Actions ▼]     │
+├─────────────────────────────────────┤
+│ Worker List:                        │
+│ ┌─────────────────────────────────┐ │
+│ │ ID: CWS-ABC-001                 │ │
+│ │ Name: John Doe                  │ │
+│ │ Room: 205 (Hotel Paradise)      │ │
+│ │ Status: Active                  │ │
+│ │ [Extend] [Remove]               │ │
+│ └─────────────────────────────────┘ │
+└─────────────────────────────────────┘
+```
+
+#### **Hotel Dashboard:**
+```
+MAIN VIEW:
+┌─────────────────────────────────────┐
+│ CrewStay - [Hotel Name]             │
+├─────────────────────────────────────┤
+│ Pending Requests: (2)               │
+│ ┌─────────────────────────────────┐ │
+│ │ Worker: CWS-ABC-001             │ │
+│ │ Company: ABC Construction       │ │
+│ │ Duration: 30 days               │ │
+│ │ [Assign Room] [Reject]          │ │
+│ └─────────────────────────────────┘ │
+├─────────────────────────────────────┤
+│ Current Occupants: (15)             │
+│ Room 201: CWS-ABC-005 (John Smith)  │
+│ Room 205: CWS-ABC-001 (John Doe)    │
+└─────────────────────────────────────┘
+```
+
+### Technical Stack for MVP
+
+**Frontend:** React.js with basic Bootstrap/Tailwind CSS
+**Backend:** Node.js/Express or simple Python Flask
+**Database:** SQLite or PostgreSQL  
+**Real-time Updates:** Socket.io or simple polling
+**Authentication:** Basic JWT tokens
+**Hosting:** Simple cloud hosting (Heroku, Vercel, or Railway)
+
+### Database Schema (Simplified)
+
+```sql
+USERS TABLE:
+- id, email, password, user_type, company_name, contact_info
+
+WORKERS TABLE:
+- id, worker_id, name, phone, id_number, company_id, status, 
+  expected_duration, assigned_hotel, room_number, created_date
+
+ACCOMMODATION_REQUESTS TABLE:
+- id, worker_id, company_id, hotel_id, status, request_date, 
+  assigned_room, notes
+
+EXTENSIONS TABLE:
+- id, worker_id, current_end_date, requested_end_date, 
+  status, hotel_response, created_date
+```
+
+### Key MVP Workflows
+
+#### **Workflow 1: Adding New Worker**
+1. Company adds worker details
+2. System generates unique ID
+3. Hotel receives instant notification
+4. Hotel assigns room number
+5. Company dashboard auto-updates with room info
+
+#### **Workflow 2: Extending Worker Stay**
+1. Company selects worker(s) and new dates
+2. Extension request sent to hotel
+3. Hotel approves/rejects
+4. Both dashboards update status instantly
+
+#### **Workflow 3: Removing Worker** 
+1. Company marks worker as discontinued
+2. Hotel receives immediate notification
+3. Hotel updates occupancy records
+4. Worker moved to inactive list
+
+### MVP Development Timeline
+
+**Week 1-2:** Basic authentication and user dashboards
+**Week 3:** Worker management and room assignment features  
+**Week 4:** Real-time notifications and extension system
+**Week 5:** Testing, bug fixes, and deployment
+
+### Success Metrics for MVP
+- Construction companies can add/manage workers efficiently
+- Hotels can track occupancy and assign rooms seamlessly  
+- Real-time updates work without manual refresh
+- Extension requests are processed smoothly
+- Zero confusion about worker status between parties
+
+This MVP focuses purely on **operational efficiency and clear communication** between construction companies and hotels, eliminating the complexity of payments while achieving your core goals.
