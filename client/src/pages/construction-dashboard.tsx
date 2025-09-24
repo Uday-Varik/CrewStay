@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { WorkerStatusBadge } from "@/components/worker-status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AddWorkerModal } from "@/components/add-worker-modal";
 import { BulkImportModal } from "@/components/bulk-import-modal";
@@ -25,17 +26,23 @@ export default function ConstructionDashboard() {
   });
 
   // Fetch statistics
-  const { data: stats } = useQuery({
+  const { data: stats, refetch: refetchStats } = useQuery({
     queryKey: ["/api/stats"],
   });
 
   // WebSocket for real-time updates
   useWebSocket({
-    onMessage: (message) => {
+    onMessage: (message: any) => {
       if (message.type === "room_assigned") {
         refetchWorkers();
+        refetchStats();
       } else if (message.type === "extension_response") {
         refetchWorkers();
+        refetchStats();
+      } else if (message.type === "worker_status_updated") {
+        // Real-time worker status updates
+        refetchWorkers();
+        refetchStats();
       }
     },
   });
@@ -62,7 +69,7 @@ export default function ConstructionDashboard() {
     }
   };
 
-  const filteredWorkers = workers.filter((worker: any) =>
+  const filteredWorkers = (workers as any[]).filter((worker: any) =>
     worker.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     worker.workerId.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -92,9 +99,9 @@ export default function ConstructionDashboard() {
                   <div className="flex items-center space-x-3 px-3 py-2 rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors" data-testid="link-extensions">
                     <Clock className="w-5 h-5" />
                     <span>Extensions</span>
-                    {stats?.extensionsDue > 0 && (
+                    {(stats as any)?.extensionsDue > 0 && (
                       <Badge className="ml-auto bg-primary text-primary-foreground text-xs notification-badge" data-testid="badge-extensions-due">
-                        {stats.extensionsDue}
+                        {(stats as any).extensionsDue}
                       </Badge>
                     )}
                   </div>
@@ -163,7 +170,7 @@ export default function ConstructionDashboard() {
                   <div>
                     <p className="text-sm text-muted-foreground">Total Workers</p>
                     <p className="text-2xl font-bold text-foreground" data-testid="stat-total-workers">
-                      {stats?.totalWorkers || 0}
+                      {(stats as any)?.totalWorkers || 0}
                     </p>
                   </div>
                   <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
@@ -179,7 +186,7 @@ export default function ConstructionDashboard() {
                   <div>
                     <p className="text-sm text-muted-foreground">Active Workers</p>
                     <p className="text-2xl font-bold text-green-600" data-testid="stat-active-workers">
-                      {stats?.activeWorkers || 0}
+                      {(stats as any)?.activeWorkers || 0}
                     </p>
                   </div>
                   <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
@@ -195,7 +202,7 @@ export default function ConstructionDashboard() {
                   <div>
                     <p className="text-sm text-muted-foreground">Pending Assignments</p>
                     <p className="text-2xl font-bold text-orange-600" data-testid="stat-pending-assignments">
-                      {stats?.pendingAssignments || 0}
+                      {(stats as any)?.pendingAssignments || 0}
                     </p>
                   </div>
                   <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
@@ -211,7 +218,7 @@ export default function ConstructionDashboard() {
                   <div>
                     <p className="text-sm text-muted-foreground">Extensions Due</p>
                     <p className="text-2xl font-bold text-primary" data-testid="stat-extensions-due">
-                      {stats?.extensionsDue || 0}
+                      {(stats as any)?.extensionsDue || 0}
                     </p>
                   </div>
                   <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
@@ -260,7 +267,7 @@ export default function ConstructionDashboard() {
                   </div>
                 ) : filteredWorkers.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground" data-testid="empty-workers">
-                    {workers.length === 0 ? "No workers added yet." : "No workers match your search."}
+                    {(workers as any[]).length === 0 ? "No workers added yet." : "No workers match your search."}
                   </div>
                 ) : (
                   <Table>
@@ -325,29 +332,15 @@ export default function ConstructionDashboard() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge
-                              variant={
-                                worker.status === "active"
-                                  ? "default"
-                                  : worker.status === "pending"
-                                  ? "secondary"
-                                  : "outline"
-                              }
-                              className={
-                                worker.status === "active"
-                                  ? "bg-green-100 text-green-800 hover:bg-green-100"
-                                  : worker.status === "pending"
-                                  ? "bg-orange-100 text-orange-800 hover:bg-orange-100"
-                                  : ""
-                              }
-                              data-testid={`badge-worker-status-${worker.id}`}
-                            >
-                              {worker.status.charAt(0).toUpperCase() + worker.status.slice(1)}
-                            </Badge>
+                            <WorkerStatusBadge 
+                              status={worker.status} 
+                              size="sm" 
+                              data-testid={`status-worker-${worker.id}`}
+                            />
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center space-x-2">
-                              {worker.status === "active" && (
+                              {["checked_in", "extension_approved"].includes(worker.status) && (
                                 <Button
                                   variant="ghost"
                                   size="sm"

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { WorkerStatusBadge } from "@/components/worker-status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AssignRoomModal } from "@/components/assign-room-modal";
 import { NotificationToast } from "@/components/notification-toast";
@@ -30,21 +31,30 @@ export default function HotelDashboard() {
   });
 
   // Fetch statistics
-  const { data: stats } = useQuery({
+  const { data: stats, refetch: refetchStats } = useQuery({
     queryKey: ["/api/stats"],
   });
 
   // WebSocket for real-time updates
   useWebSocket({
-    onMessage: (message) => {
+    onMessage: (message: any) => {
       if (message.type === "new_worker_request") {
         refetchRequests();
+        refetchStats();
       } else if (message.type === "worker_discontinued") {
         refetchRequests();
+        refetchStats();
       } else if (message.type === "extension_request") {
-        refetchExtensions(); // Fix: refetch extensions, not requests
+        refetchExtensions();
+        refetchStats();
       } else if (message.type === "extension_response") {
         refetchExtensions();
+        refetchStats();
+      } else if (message.type === "worker_status_updated") {
+        // Real-time worker status updates
+        refetchRequests();
+        refetchExtensions();
+        refetchStats();
       }
     },
   });
@@ -121,9 +131,9 @@ export default function HotelDashboard() {
     }
   };
 
-  const pendingRequests = requests.filter((req: any) => req.status === "pending");
-  const approvedRequests = requests.filter((req: any) => req.status === "approved");
-  const pendingExtensions = extensions.filter((ext: any) => ext.status === "pending");
+  const pendingRequests = (requests as any[]).filter((req: any) => req.status === "pending");
+  const approvedRequests = (requests as any[]).filter((req: any) => req.status === "approved");
+  const pendingExtensions = (extensions as any[]).filter((ext: any) => ext.status === "pending");
 
   const filteredApprovedRequests = approvedRequests.filter((request: any) =>
     request.worker.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -366,9 +376,11 @@ export default function HotelDashboard() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100" data-testid={`occupant-status-${request.id}`}>
-                              Checked In
-                            </Badge>
+                            <WorkerStatusBadge 
+                              status={request.worker?.status || "checked_in"} 
+                              size="sm" 
+                              data-testid={`status-occupant-${request.id}`}
+                            />
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center space-x-2">

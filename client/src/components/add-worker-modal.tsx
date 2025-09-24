@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -85,9 +85,12 @@ export function AddWorkerModal({ open, onOpenChange, onWorkerAdded }: AddWorkerM
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="w-full max-w-lg" data-testid="modal-add-worker">
+      <DialogContent className="w-full max-w-lg" data-testid="modal-add-worker" aria-describedby="add-worker-description">
         <DialogHeader>
           <DialogTitle>Add New Worker</DialogTitle>
+          <DialogDescription id="add-worker-description">
+            Add a new construction worker to request accommodation from available hotels.
+          </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
@@ -168,11 +171,15 @@ export function AddWorkerModal({ open, onOpenChange, onWorkerAdded }: AddWorkerM
                   <SelectValue placeholder={hotelsLoading ? "Loading hotels..." : "Any Available Hotel"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Any Available Hotel</SelectItem>
-                  {hotels.map((hotel) => (
-                    <SelectItem key={hotel.id} value={hotel.id}>
-                      {hotel.companyName}
-                    </SelectItem>
+                  <SelectItem value="" data-testid="option-any-hotel">
+                    Any Available Hotel
+                  </SelectItem>
+                  {Array.isArray(hotels) && hotels.map((hotel) => (
+                    hotel?.id && hotel?.companyName ? (
+                      <SelectItem key={hotel.id} value={hotel.id} data-testid={`option-hotel-${hotel.id}`}>
+                        {hotel.companyName}
+                      </SelectItem>
+                    ) : null
                   ))}
                 </SelectContent>
               </Select>

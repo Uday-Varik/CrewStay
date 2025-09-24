@@ -60,12 +60,29 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   sessionStore: Store;
+  private broadcastFunctions?: {
+    broadcastToUser: (userId: string, message: any) => void;
+    broadcastToUserType: (userType: string, message: any) => void;
+  };
 
   constructor() {
     this.sessionStore = new PostgresSessionStore({ 
       pool, 
       createTableIfMissing: true 
     });
+  }
+
+  setBroadcastFunctions(functions: {
+    broadcastToUser: (userId: string, message: any) => void;
+    broadcastToUserType: (userType: string, message: any) => void;
+  }) {
+    this.broadcastFunctions = functions;
+  }
+
+  private broadcastStatusUpdate(userId: string, userType: string, message: any) {
+    if (this.broadcastFunctions) {
+      this.broadcastFunctions.broadcastToUser(userId, message);
+    }
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -213,6 +230,36 @@ export class DatabaseStorage implements IStorage {
       .update(workers)
       .set({ status })
       .where(eq(workers.id, id));
+
+    // Get worker details for real-time notification
+    const worker = await this.getWorkerById(id);
+    if (worker) {
+      // Broadcast status change to construction company
+      this.broadcastStatusUpdate(worker.companyId, "construction", {
+        type: "worker_status_updated",
+        data: {
+          workerId: worker.id,
+          workerName: worker.name,
+          oldStatus: worker.status,
+          newStatus: status,
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      // If worker has assigned hotel, also notify hotel
+      if (worker.assignedHotelId) {
+        this.broadcastStatusUpdate(worker.assignedHotelId, "hotel", {
+          type: "worker_status_updated", 
+          data: {
+            workerId: worker.id,
+            workerName: worker.name,
+            oldStatus: worker.status,
+            newStatus: status,
+            timestamp: new Date().toISOString(),
+          },
+        });
+      }
+    }
   }
 
   async updateWorkerAssignment(id: string, hotelId: string, roomNumber: string): Promise<void> {

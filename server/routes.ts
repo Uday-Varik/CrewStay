@@ -479,5 +479,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }
 
+  // Connect storage with broadcast functions for real-time updates
+  storage.setBroadcastFunctions({
+    broadcastToUser,
+    broadcastToUserType,
+  });
+
   return httpServer;
 }
