@@ -9,16 +9,22 @@ import { Badge } from "@/components/ui/badge";
 import { WorkerStatusBadge } from "@/components/worker-status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AssignRoomModal } from "@/components/assign-room-modal";
+import { BulkApprovalModal } from "@/components/bulk-approval-modal";
 import { NotificationToast } from "@/components/notification-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Bed, Inbox, Calendar, UserCheck, Clock, DoorOpen, Search, Download, LogOut } from "lucide-react";
+import { Bed, Inbox, Calendar, UserCheck, Clock, DoorOpen, Search, Download, Filter, Users, CheckCircle2, X } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function HotelDashboard() {
-  const { user, logoutMutation } = useAuth();
+  const { user } = useAuth();
   const [showAssignRoomModal, setShowAssignRoomModal] = useState(false);
+  const [showBulkApprovalModal, setShowBulkApprovalModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeView, setActiveView] = useState<"rooms" | "requests">("rooms");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("newest");
+  const [activeTab, setActiveTab] = useState<"requests" | "extensions">("requests");
 
   // Fetch accommodation requests
   const { data: requests = [], isLoading: requestsLoading, refetch: refetchRequests } = useQuery({
@@ -99,6 +105,62 @@ export default function HotelDashboard() {
     },
   });
 
+  // Filter and sort accommodation requests
+  const filteredRequests = requests
+    .filter((request: any) => {
+      const matchesSearch = !searchTerm || 
+        request.worker?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        request.worker?.workerId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        request.notes?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === "all" || request.status === statusFilter;
+      
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a: any, b: any) => {
+      switch (sortBy) {
+        case "newest":
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case "oldest":
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case "name":
+          return a.worker?.name.localeCompare(b.worker?.name);
+        case "duration":
+          return (b.worker?.expectedDuration || 0) - (a.worker?.expectedDuration || 0);
+        default:
+          return 0;
+      }
+    });
+  
+  // Filter and sort extension requests
+  const filteredExtensions = extensions
+    .filter((extension: any) => {
+      const matchesSearch = !searchTerm || 
+        extension.worker?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        extension.worker?.workerId.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === "all" || extension.status === statusFilter;
+      
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a: any, b: any) => {
+      switch (sortBy) {
+        case "newest":
+          return new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime();
+        case "oldest":
+          return new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime();
+        case "name":
+          return a.worker?.name.localeCompare(b.worker?.name);
+        case "duration":
+          return (b.additionalDays || 0) - (a.additionalDays || 0);
+        default:
+          return 0;
+      }
+    });
+  
+  const pendingRequestsCount = requests.filter((req: any) => req.status === "pending").length;
+  const pendingExtensionsCount = extensions.filter((ext: any) => ext.status === "pending").length;
+
   const handleAssignRoom = (request: any) => {
     setSelectedRequest(request);
     setShowAssignRoomModal(true);
@@ -131,450 +193,404 @@ export default function HotelDashboard() {
     }
   };
 
-  const pendingRequests = (requests as any[]).filter((req: any) => req.status === "pending");
-  const approvedRequests = (requests as any[]).filter((req: any) => req.status === "approved");
-  const pendingExtensions = (extensions as any[]).filter((ext: any) => ext.status === "pending");
-
-  const filteredApprovedRequests = approvedRequests.filter((request: any) =>
-    request.worker.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    request.worker.workerId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    request.assignedRoom?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   return (
-    <div className="min-h-screen bg-background">
-      <div className="flex">
-        {/* Sidebar */}
-        <div className="w-64 bg-card border-r border-border h-screen sticky top-0">
-          <div className="p-6 border-b border-border">
-            <h2 className="text-xl font-bold text-primary">CrewStay</h2>
-            <p className="text-sm text-muted-foreground" data-testid="text-hotel-name">
-              {user?.companyName}
-            </p>
+    <div className="p-6 max-w-7xl mx-auto">
+      {/* Page Header */}
+      <div className="mb-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Hotel Dashboard</h1>
+            <p className="text-muted-foreground">Manage accommodation requests and room assignments</p>
           </div>
           
-          <nav className="p-4">
-            <ul className="space-y-2">
-              <li>
-                <Button
-                  variant="ghost"
-                  className={`w-full justify-start ${activeView === "rooms" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`}
-                  onClick={() => setActiveView("rooms")}
-                  data-testid="button-room-management"
-                >
-                  <Bed className="w-5 h-5 mr-3" />
-                  Room Management
-                </Button>
-              </li>
-              <li>
-                <Button
-                  variant="ghost"
-                  className={`w-full justify-start ${activeView === "requests" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`}
-                  onClick={() => setActiveView("requests")}
-                  data-testid="button-requests"
-                >
-                  <Inbox className="w-5 h-5 mr-3" />
-                  Requests
-                  {pendingRequests.length > 0 && (
-                    <Badge className="ml-auto bg-orange-500 text-white text-xs notification-badge" data-testid="badge-pending-requests">
-                      {pendingRequests.length}
-                    </Badge>
-                  )}
-                </Button>
-              </li>
-            </ul>
-          </nav>
-          
-          <div className="absolute bottom-4 left-4 right-4">
+          <div className="flex items-center space-x-4">
+            {/* Real-time Status Indicator */}
+            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span>Live Updates Active</span>
+            </div>
+            
             <Button
-              variant="ghost"
-              className="w-full justify-start"
-              onClick={() => logoutMutation.mutate()}
-              data-testid="button-logout"
+              onClick={() => setShowBulkApprovalModal(true)}
+              disabled={pendingRequestsCount === 0}
+              className="flex items-center space-x-2"
+              data-testid="button-bulk-approval"
             >
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
+              <Users className="w-4 h-4" />
+              <span>Bulk Approve ({pendingRequestsCount})</span>
             </Button>
           </div>
         </div>
-        
-        {/* Main Content */}
-        <div className="flex-1 overflow-auto">
-          {/* Header */}
-          <header className="bg-card border-b border-border p-6">
-            <div className="flex justify-between items-center">
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-foreground">
-                  {activeView === "rooms" ? "Room Management" : "Accommodation Requests"}
-                </h1>
-                <p className="text-muted-foreground">
-                  {activeView === "rooms" 
-                    ? "Manage accommodation requests and room assignments" 
-                    : "Review and process accommodation requests"
-                  }
+                <p className="text-sm text-muted-foreground">Pending Requests</p>
+                <p className="text-2xl font-bold text-orange-600" data-testid="stat-pending-requests">
+                  {pendingRequestsCount || 0}
                 </p>
               </div>
-              
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <span>Live Updates Active</span>
-                </div>
+              <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center">
+                <Inbox className="text-orange-600 w-5 h-5" />
               </div>
             </div>
-          </header>
-          
-          {/* Content based on active view */}
-          {activeView === "rooms" && (
-            <>
-              {/* Stats Cards */}
-              <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Total Rooms</p>
-                        <p className="text-2xl font-bold text-foreground" data-testid="stat-total-rooms">
-                          {(stats as any)?.totalRooms || 0}
-                        </p>
-                      </div>
-                      <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                        <Bed className="text-primary w-5 h-5" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Occupied</p>
-                        <p className="text-2xl font-bold text-green-600" data-testid="stat-occupied-rooms">
-                          {(stats as any)?.occupiedRooms || 0}
-                        </p>
-                      </div>
-                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                        <UserCheck className="text-green-600 w-5 h-5" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Pending Requests</p>
-                        <p className="text-2xl font-bold text-orange-600" data-testid="stat-pending-requests">
-                          {(stats as any)?.pendingRequests || 0}
-                        </p>
-                      </div>
-                      <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                        <Clock className="text-orange-600 w-5 h-5" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Available</p>
-                        <p className="text-2xl font-bold text-primary" data-testid="stat-available-rooms">
-                          {(stats as any)?.availableRooms || 0}
-                        </p>
-                      </div>
-                      <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                        <DoorOpen className="text-primary w-5 h-5" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Occupied Rooms</p>
+                <p className="text-2xl font-bold text-blue-600" data-testid="stat-occupied-rooms">
+                  {(stats as any)?.occupiedRooms || 0}
+                </p>
+              </div>
+              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
+                <Bed className="text-blue-600 w-5 h-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Extension Requests</p>
+                <p className="text-2xl font-bold text-purple-600" data-testid="stat-pending-extensions">
+                  {pendingExtensionsCount || 0}
+                </p>
+              </div>
+              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center">
+                <Calendar className="text-purple-600 w-5 h-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Monthly Revenue</p>
+                <p className="text-2xl font-bold text-green-600" data-testid="stat-monthly-revenue">
+                  ${((stats as any)?.monthlyRevenue || 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="w-10 h-10 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
+                <DoorOpen className="text-green-600 w-5 h-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters and Search */}
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row gap-4 items-center">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                placeholder="Search by worker name, ID, or notes..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+                data-testid="input-search-requests"
+              />
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2">
+                <Filter className="w-4 h-4 text-muted-foreground" />
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-32" data-testid="select-status-filter">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               
-              {/* Current Occupants Section for Room Management View */}
-              <div className="px-6 pb-6">
-            <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle className="flex items-center">
-                    <UserCheck className="mr-2 text-green-500 w-5 h-5" />
-                    Current Occupants
-                    <span className="ml-2 text-sm text-muted-foreground">({approvedRequests.length} workers)</span>
-                  </CardTitle>
-                  <div className="flex items-center space-x-4">
-                    <div className="relative">
-                      <Input
-                        type="text"
-                        placeholder="Search rooms or workers..."
-                        className="pl-10"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        data-testid="input-search-occupants"
-                      />
-                      <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-                    </div>
-                  </div>
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-32" data-testid="select-sort-by">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest</SelectItem>
+                  <SelectItem value="oldest">Oldest</SelectItem>
+                  <SelectItem value="name">Name A-Z</SelectItem>
+                  <SelectItem value="duration">Duration</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Main Content Tabs */}
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "requests" | "extensions")}>
+        <TabsList className="mb-6">
+          <TabsTrigger value="requests" className="flex items-center space-x-2" data-testid="tab-requests">
+            <Inbox className="w-4 h-4" />
+            <span>Accommodation Requests</span>
+            {pendingRequestsCount > 0 && (
+              <Badge variant="destructive" className="ml-2">
+                {pendingRequestsCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="extensions" className="flex items-center space-x-2" data-testid="tab-extensions">
+            <Calendar className="w-4 h-4" />
+            <span>Extension Requests</span>
+            {pendingExtensionsCount > 0 && (
+              <Badge variant="destructive" className="ml-2">
+                {pendingExtensionsCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="requests">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>Accommodation Requests</CardTitle>
+                <div className="text-sm text-muted-foreground">
+                  Showing {filteredRequests.length} of {requests.length} requests
                 </div>
-              </CardHeader>
-              
-              <CardContent>
-                {requestsLoading ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    Loading occupants...
-                  </div>
-                ) : filteredApprovedRequests.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground" data-testid="empty-occupants">
-                    {approvedRequests.length === 0 ? "No current occupants." : "No occupants match your search."}
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Room</TableHead>
-                        <TableHead>Worker Info</TableHead>
-                        <TableHead>Company</TableHead>
-                        <TableHead>Check-in Date</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredApprovedRequests.map((request: any) => (
-                        <TableRow key={request.id} data-testid={`occupant-${request.id}`}>
-                          <TableCell>
-                            <div className="flex items-center">
-                              <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                                <Bed className="text-primary w-4 h-4" />
-                              </div>
-                              <span className="ml-3 text-sm font-medium text-foreground" data-testid={`occupant-room-${request.id}`}>
-                                {request.assignedRoom}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {requestsLoading ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Loading requests...
+                </div>
+              ) : filteredRequests.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground" data-testid="empty-requests">
+                  {requests.length === 0 ? "No accommodation requests yet." : "No requests match your search criteria."}
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Worker Info</TableHead>
+                      <TableHead>Request Details</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredRequests.map((request: any) => (
+                      <TableRow key={request.id} data-testid={`row-request-${request.id}`}>
+                        <TableCell>
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center">
+                              <span className="text-primary font-medium text-sm">
+                                {request.worker?.name.split(' ').map((n: string) => n[0]).join('')}
                               </span>
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <div className="text-sm font-medium text-foreground" data-testid={`occupant-name-${request.id}`}>
-                                {request.worker.name}
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-foreground" data-testid={`text-worker-name-${request.id}`}>
+                                {request.worker?.name}
                               </div>
-                              <div className="text-sm text-muted-foreground font-mono" data-testid={`occupant-id-${request.id}`}>
-                                {request.worker.workerId}
+                              <div className="text-sm text-muted-foreground font-mono" data-testid={`text-worker-id-${request.id}`}>
+                                {request.worker?.workerId}
                               </div>
-                              <div className="text-xs text-muted-foreground" data-testid={`occupant-phone-${request.id}`}>
-                                {request.worker.phone}
+                              <div className="text-xs text-muted-foreground">
+                                {request.worker?.phone}
                               </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground" data-testid={`occupant-company-${request.id}`}>
-                            {request.company.companyName}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            <div data-testid={`occupant-checkin-${request.id}`}>
-                              {new Date(request.respondedAt || request.requestDate).toLocaleDateString()}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <WorkerStatusBadge 
-                              status={request.worker?.status || "checked_in"} 
-                              size="sm" 
-                              data-testid={`status-occupant-${request.id}`}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-muted-foreground hover:text-foreground"
-                                data-testid={`button-view-details-${request.id}`}
-                              >
-                                👁️
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-            </>
-          )}
-
-          {/* Requests View */}
-          {activeView === "requests" && (
-            <div className="p-6 space-y-6">
-              {/* Pending Accommodation Requests */}
-              {pendingRequests.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Inbox className="mr-2 text-orange-500 w-5 h-5" />
-                      Pending Accommodation Requests
-                      <Badge className="ml-2 bg-orange-100 text-orange-800 text-xs" data-testid="badge-new-requests">
-                        {pendingRequests.length} New
-                      </Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  
-                  <CardContent className="p-0">
-                    <div className="divide-y divide-border">
-                      {pendingRequests.map((request: any) => (
-                        <div key={request.id} className="p-4 hover:bg-muted/50 transition-colors" data-testid={`request-${request.id}`}>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                              <div className="flex-shrink-0 h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                                <span className="text-primary font-bold text-sm">
-                                  {request.worker.name.split(' ').map((n: string) => n[0]).join('')}
-                                </span>
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-2">
-                                  <h4 className="text-sm font-medium text-foreground" data-testid={`request-worker-name-${request.id}`}>
-                                    {request.worker.name}
-                                  </h4>
-                                  <span className="text-xs text-muted-foreground font-mono" data-testid={`request-worker-id-${request.id}`}>
-                                    {request.worker.workerId}
-                                  </span>
-                                </div>
-                                <p className="text-sm text-muted-foreground" data-testid={`request-company-${request.id}`}>
-                                  {request.company.companyName}
-                                </p>
-                                <div className="flex items-center space-x-4 mt-1 text-xs text-muted-foreground">
-                                  <span>Phone: <span data-testid={`request-worker-phone-${request.id}`}>{request.worker.phone}</span></span>
-                                  <span>Requested: <span data-testid={`request-date-${request.id}`}>
-                                    {new Date(request.requestDate).toLocaleDateString()}
-                                  </span></span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Button
-                                onClick={() => handleAssignRoom(request)}
-                                className="text-sm font-medium"
-                                data-testid={`button-assign-room-${request.id}`}
-                              >
-                                Assign Room
-                              </Button>
-                              <Button
-                                variant="outline"
-                                onClick={() => handleRejectRequest(request.id)}
-                                className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground text-sm font-medium"
-                                data-testid={`button-reject-${request.id}`}
-                              >
-                                Reject
-                              </Button>
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Pending Extension Requests */}
-              {pendingExtensions.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Clock className="mr-2 text-blue-500 w-5 h-5" />
-                      Pending Extension Requests
-                      <Badge className="ml-2 bg-blue-100 text-blue-800 text-xs" data-testid="badge-extension-requests">
-                        {pendingExtensions.length} New
-                      </Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  
-                  <CardContent className="p-0">
-                    <div className="divide-y divide-border">
-                      {pendingExtensions.map((extension: any) => (
-                        <div key={extension.id} className="p-4 hover:bg-muted/50 transition-colors" data-testid={`extension-${extension.id}`}>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                              <div className="flex-shrink-0 h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                                <Clock className="text-blue-600 w-6 h-6" />
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div className="font-medium">Duration: {request.worker?.expectedDuration} days</div>
+                            {request.notes && (
+                              <div className="text-muted-foreground mt-1 text-xs">{request.notes}</div>
+                            )}
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Requested: {new Date(request.createdAt).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <WorkerStatusBadge status={request.worker?.status} size="sm" />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            {request.status === "pending" && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleAssignRoom(request)}
+                                  className="flex items-center space-x-1"
+                                  data-testid={`button-assign-room-${request.id}`}
+                                >
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>Assign Room</span>
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleRejectRequest(request.id)}
+                                  className="flex items-center space-x-1 text-red-600"
+                                  data-testid={`button-reject-${request.id}`}
+                                >
+                                  <X className="w-3 h-3" />
+                                  <span>Reject</span>
+                                </Button>
+                              </>
+                            )}
+                            {request.status === "approved" && request.assignedRoom && (
+                              <div className="text-sm text-green-600">
+                                Room {request.assignedRoom}
                               </div>
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-2">
-                                  <h4 className="text-sm font-medium text-foreground" data-testid={`extension-worker-name-${extension.id}`}>
-                                    {extension.worker.name}
-                                  </h4>
-                                  <span className="text-xs text-muted-foreground font-mono" data-testid={`extension-worker-id-${extension.id}`}>
-                                    {extension.worker.workerId}
-                                  </span>
-                                </div>
-                                <p className="text-sm text-muted-foreground" data-testid={`extension-company-${extension.id}`}>
-                                  {extension.worker.company?.companyName}
-                                </p>
-                                <div className="flex items-center space-x-4 mt-1 text-xs text-muted-foreground">
-                                  <span>Current End: <span data-testid={`extension-current-date-${extension.id}`}>
-                                    {new Date(extension.currentEndDate).toLocaleDateString()}
-                                  </span></span>
-                                  <span>Requested: <span data-testid={`extension-requested-date-${extension.id}`}>
-                                    {new Date(extension.requestedEndDate).toLocaleDateString()}
-                                  </span></span>
-                                </div>
-                                {extension.reason && (
-                                  <p className="text-sm text-muted-foreground mt-1" data-testid={`extension-reason-${extension.id}`}>
-                                    Reason: {extension.reason}
-                                  </p>
-                                )}
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="extensions">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>Extension Requests</CardTitle>
+                <div className="text-sm text-muted-foreground">
+                  Showing {filteredExtensions.length} of {extensions.length} extensions
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {extensionsLoading ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Loading extensions...
+                </div>
+              ) : filteredExtensions.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground" data-testid="empty-extensions">
+                  {extensions.length === 0 ? "No extension requests yet." : "No extensions match your search criteria."}
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Worker Info</TableHead>
+                      <TableHead>Extension Details</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredExtensions.map((extension: any) => (
+                      <TableRow key={extension.id} data-testid={`row-extension-${extension.id}`}>
+                        <TableCell>
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center">
+                              <span className="text-primary font-medium text-sm">
+                                {extension.worker?.name.split(' ').map((n: string) => n[0]).join('')}
+                              </span>
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-foreground">
+                                {extension.worker?.name}
+                              </div>
+                              <div className="text-sm text-muted-foreground font-mono">
+                                {extension.worker?.workerId}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Room: {extension.worker?.assignedRoom}
                               </div>
                             </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div className="font-medium">Additional: {extension.additionalDays} days</div>
+                            <div className="text-muted-foreground">{extension.reason}</div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Requested: {new Date(extension.requestedAt).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            extension.status === "approved" ? "default" :
+                            extension.status === "rejected" ? "destructive" : "secondary"
+                          }>
+                            {extension.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {extension.status === "pending" && (
                             <div className="flex items-center space-x-2">
                               <Button
-                                onClick={() => handleApproveExtension(extension.id, "Extension approved by hotel")}
-                                className="text-sm font-medium bg-green-600 hover:bg-green-700"
+                                size="sm"
+                                onClick={() => handleApproveExtension(extension.id, "Extension approved by hotel management")}
+                                className="flex items-center space-x-1"
                                 data-testid={`button-approve-extension-${extension.id}`}
                               >
-                                Approve
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>Approve</span>
                               </Button>
                               <Button
+                                size="sm"
                                 variant="outline"
-                                onClick={() => handleRejectExtension(extension.id, "Extension rejected by hotel")}
-                                className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground text-sm font-medium"
+                                onClick={() => handleRejectExtension(extension.id, "Extension rejected by hotel management")}
+                                className="flex items-center space-x-1 text-red-600"
                                 data-testid={`button-reject-extension-${extension.id}`}
                               >
-                                Reject
+                                <X className="w-3 h-3" />
+                                <span>Reject</span>
                               </Button>
                             </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
-
-              {/* No Requests Message */}
-              {pendingRequests.length === 0 && pendingExtensions.length === 0 && (
-                <Card>
-                  <CardContent className="p-8 text-center">
-                    <Inbox className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-medium text-foreground mb-2">No Pending Requests</h3>
-                    <p className="text-muted-foreground">All accommodation and extension requests have been processed.</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Modals */}
       <AssignRoomModal
         open={showAssignRoomModal}
         onOpenChange={setShowAssignRoomModal}
         request={selectedRequest}
-        onRoomAssigned={() => {
+        onRequestUpdated={() => {
           refetchRequests();
+          refetchStats();
           setShowAssignRoomModal(false);
           setSelectedRequest(null);
+        }}
+      />
+
+      <BulkApprovalModal
+        open={showBulkApprovalModal}
+        onOpenChange={setShowBulkApprovalModal}
+        requests={requests}
+        onRequestsUpdated={() => {
+          refetchRequests();
+          refetchStats();
         }}
       />
 
