@@ -40,6 +40,12 @@ export function setupAuth(app: Express) {
     resave: false,
     saveUninitialized: false,
     store: storage.sessionStore,
+    cookie: {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+    },
   };
 
   app.set("trust proxy", 1);
@@ -78,23 +84,35 @@ export function setupAuth(app: Express) {
         password: await hashPassword(userData.password),
       });
 
-      req.login(user, (err) => {
+      req.session.regenerate((err) => {
         if (err) return next(err);
-        res.status(201).json(toPublicUser(user));
+        req.login(user, (loginErr) => {
+          if (loginErr) return next(loginErr);
+          res.status(201).json(toPublicUser(user));
+        });
       });
     } catch (error) {
       res.status(400).json({ message: "Invalid data", error: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
-  app.post("/api/login", passport.authenticate("local"), (req, res) => {
-    res.status(200).json(toPublicUser(req.user!));
+  app.post("/api/login", passport.authenticate("local"), (req, res, next) => {
+    req.session.regenerate((err) => {
+      if (err) return next(err);
+      req.login(req.user!, (loginErr) => {
+        if (loginErr) return next(loginErr);
+        res.status(200).json(toPublicUser(req.user!));
+      });
+    });
   });
 
   app.post("/api/logout", (req, res, next) => {
     req.logout((err) => {
       if (err) return next(err);
-      res.sendStatus(200);
+      req.session.regenerate((sessionErr) => {
+        if (sessionErr) return next(sessionErr);
+        res.sendStatus(200);
+      });
     });
   });
 
