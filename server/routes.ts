@@ -269,12 +269,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { status, hotelResponse } = req.body;
       
-      await storage.updateExtensionStatus(req.params.id, status, hotelResponse);
-
-      // Notify construction company
+      // Authorization check: Ensure extension belongs to a worker assigned to this hotel
       const extensions = await storage.getExtensionsByHotel(req.user!.id);
       const extension = extensions.find(e => e.id === req.params.id);
       
+      if (!extension) {
+        return res.status(403).json({ message: "Access denied: Extension not found or not assigned to your hotel" });
+      }
+      
+      await storage.updateExtensionStatus(req.params.id, status, hotelResponse);
+
+      // Notify construction company
       if (extension) {
         const worker = await storage.getWorkerById(extension.workerId);
         if (worker) {

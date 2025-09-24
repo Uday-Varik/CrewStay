@@ -53,6 +53,7 @@ export const extensions = pgTable("extensions", {
   workerId: varchar("worker_id").references(() => workers.id).notNull(),
   currentEndDate: timestamp("current_end_date").notNull(),
   requestedEndDate: timestamp("requested_end_date").notNull(),
+  reason: text("reason"),
   status: extensionStatusEnum("status").default("pending").notNull(),
   hotelResponse: text("hotel_response"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -131,6 +132,10 @@ export const insertExtensionSchema = createInsertSchema(extensions).pick({
   workerId: true,
   currentEndDate: true,
   requestedEndDate: true,
+  reason: true,
+}).extend({
+  currentEndDate: z.coerce.date(),
+  requestedEndDate: z.coerce.date(),
 });
 
 // Types

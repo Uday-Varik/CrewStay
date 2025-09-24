@@ -82,24 +82,50 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createWorker(worker: InsertWorker & { companyId: string }): Promise<Worker> {
-    const workerNumber = await this.getNextWorkerNumber(worker.companyId);
     const company = await this.getUser(worker.companyId);
-    const companyCode = company?.companyName.substring(0, 3).toUpperCase() || "UNK";
-    const workerId = `CWS-${companyCode}-${String(workerNumber).padStart(3, '0')}`;
+    const companyCode = company?.companyName
+      .replace(/[^A-Z0-9]/gi, '') // Remove non-alphanumeric characters
+      .substring(0, 3)
+      .toUpperCase() || "UNK";
     
     // Calculate expected end date
     const expectedEndDate = new Date();
     expectedEndDate.setDate(expectedEndDate.getDate() + worker.expectedDuration);
     
-    const [newWorker] = await db
-      .insert(workers)
-      .values({
-        ...worker,
-        workerId,
-        expectedEndDate,
-      })
-      .returning();
-    return newWorker;
+    // Generate truly unique worker ID with retry mechanism
+    let workerId: string;
+    let attempts = 0;
+    const maxAttempts = 5;
+    
+    while (attempts < maxAttempts) {
+      const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      workerId = `CWS-${companyCode}-${uniqueSuffix}`;
+      
+      try {
+        const [newWorker] = await db
+          .insert(workers)
+          .values({
+            ...worker,
+            workerId,
+            expectedEndDate,
+          })
+          .returning();
+        return newWorker;
+      } catch (error: any) {
+        if (error.code === '23505' && error.constraint === 'workers_worker_id_unique') {
+          // Unique constraint violation, retry with new ID
+          attempts++;
+          if (attempts >= maxAttempts) {
+            throw new Error('Unable to generate unique worker ID after multiple attempts');
+          }
+          continue;
+        }
+        // Re-throw other errors
+        throw error;
+      }
+    }
+    
+    throw new Error('Failed to create worker after maximum attempts');
   }
 
   async getWorkersByCompany(companyId: string): Promise<WorkerWithDetails[]> {
@@ -193,6 +219,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNextWorkerNumber(companyId: string): Promise<number> {
+    // Get the count of existing workers for this company to determine next number
     const [result] = await db
       .select({ count: count() })
       .from(workers)
@@ -356,6 +383,7 @@ export class DatabaseStorage implements IStorage {
         workerId: extensions.workerId,
         currentEndDate: extensions.currentEndDate,
         requestedEndDate: extensions.requestedEndDate,
+        reason: extensions.reason,
         status: extensions.status,
         hotelResponse: extensions.hotelResponse,
         createdAt: extensions.createdAt,
@@ -387,6 +415,7 @@ export class DatabaseStorage implements IStorage {
         workerId: extensions.workerId,
         currentEndDate: extensions.currentEndDate,
         requestedEndDate: extensions.requestedEndDate,
+        reason: extensions.reason,
         status: extensions.status,
         hotelResponse: extensions.hotelResponse,
         createdAt: extensions.createdAt,
@@ -421,10 +450,33 @@ export class DatabaseStorage implements IStorage {
       updateData.hotelResponse = hotelResponse;
     }
     
-    await db
-      .update(extensions)
-      .set(updateData)
-      .where(eq(extensions.id, id));
+    // Start transaction for atomic updates
+    await db.transaction(async (tx) => {
+      // Update extension status
+      await tx
+        .update(extensions)
+        .set(updateData)
+        .where(eq(extensions.id, id));
+      
+      // If approved, update worker's expected end date
+      if (status === "approved") {
+        const extension = await tx
+          .select({
+            workerId: extensions.workerId,
+            requestedEndDate: extensions.requestedEndDate,
+          })
+          .from(extensions)
+          .where(eq(extensions.id, id))
+          .limit(1);
+        
+        if (extension.length > 0) {
+          await tx
+            .update(workers)
+            .set({ expectedEndDate: extension[0].requestedEndDate })
+            .where(eq(workers.id, extension[0].workerId));
+        }
+      }
+    });
   }
 
   async getConstructionStats(companyId: string): Promise<{

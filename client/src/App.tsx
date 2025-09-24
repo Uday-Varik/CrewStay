@@ -9,10 +9,12 @@ import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import ConstructionDashboard from "@/pages/construction-dashboard";
 import HotelDashboard from "@/pages/hotel-dashboard";
+import ExtensionsPage from "@/pages/extensions-page";
 
 function Router() {
   return (
     <Switch>
+      <ProtectedRoute path="/extensions" component={ExtensionsPage} />
       <ProtectedRoute path="/" component={() => <DashboardRouter />} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
