@@ -17,6 +17,7 @@ export default function HotelDashboard() {
   const [showAssignRoomModal, setShowAssignRoomModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [activeView, setActiveView] = useState<"rooms" | "requests">("rooms");
 
   // Fetch accommodation requests
   const { data: requests = [], isLoading: requestsLoading, refetch: refetchRequests } = useQuery({
@@ -100,21 +101,31 @@ export default function HotelDashboard() {
           <nav className="p-4">
             <ul className="space-y-2">
               <li>
-                <div className="flex items-center space-x-3 px-3 py-2 rounded-md bg-accent text-accent-foreground">
-                  <Bed className="w-5 h-5" />
-                  <span>Room Management</span>
-                </div>
+                <Button
+                  variant="ghost"
+                  className={`w-full justify-start ${activeView === "rooms" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`}
+                  onClick={() => setActiveView("rooms")}
+                  data-testid="button-room-management"
+                >
+                  <Bed className="w-5 h-5 mr-3" />
+                  Room Management
+                </Button>
               </li>
               <li>
-                <div className="flex items-center space-x-3 px-3 py-2 rounded-md text-muted-foreground">
-                  <Inbox className="w-5 h-5" />
-                  <span>Requests</span>
+                <Button
+                  variant="ghost"
+                  className={`w-full justify-start ${activeView === "requests" ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`}
+                  onClick={() => setActiveView("requests")}
+                  data-testid="button-requests"
+                >
+                  <Inbox className="w-5 h-5 mr-3" />
+                  Requests
                   {pendingRequests.length > 0 && (
                     <Badge className="ml-auto bg-orange-500 text-white text-xs notification-badge" data-testid="badge-pending-requests">
                       {pendingRequests.length}
                     </Badge>
                   )}
-                </div>
+                </Button>
               </li>
             </ul>
           </nav>
@@ -138,8 +149,15 @@ export default function HotelDashboard() {
           <header className="bg-card border-b border-border p-6">
             <div className="flex justify-between items-center">
               <div>
-                <h1 className="text-2xl font-bold text-foreground">Room Management</h1>
-                <p className="text-muted-foreground">Manage accommodation requests and room assignments</p>
+                <h1 className="text-2xl font-bold text-foreground">
+                  {activeView === "rooms" ? "Room Management" : "Accommodation Requests"}
+                </h1>
+                <p className="text-muted-foreground">
+                  {activeView === "rooms" 
+                    ? "Manage accommodation requests and room assignments" 
+                    : "Review and process accommodation requests"
+                  }
+                </p>
               </div>
               
               <div className="flex items-center space-x-4">
@@ -151,146 +169,78 @@ export default function HotelDashboard() {
             </div>
           </header>
           
-          {/* Stats Cards */}
-          <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Total Rooms</p>
-                    <p className="text-2xl font-bold text-foreground" data-testid="stat-total-rooms">
-                      {stats?.totalRooms || 0}
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                    <Bed className="text-primary w-5 h-5" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Occupied</p>
-                    <p className="text-2xl font-bold text-green-600" data-testid="stat-occupied-rooms">
-                      {stats?.occupiedRooms || 0}
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                    <UserCheck className="text-green-600 w-5 h-5" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Pending Requests</p>
-                    <p className="text-2xl font-bold text-orange-600" data-testid="stat-pending-requests">
-                      {stats?.pendingRequests || 0}
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <Clock className="text-orange-600 w-5 h-5" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Available</p>
-                    <p className="text-2xl font-bold text-primary" data-testid="stat-available-rooms">
-                      {stats?.availableRooms || 0}
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                    <DoorOpen className="text-primary w-5 h-5" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          
-          {/* Pending Requests Section */}
-          {pendingRequests.length > 0 && (
-            <div className="p-6">
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Inbox className="mr-2 text-orange-500 w-5 h-5" />
-                    Pending Worker Requests
-                    <Badge className="ml-2 bg-orange-100 text-orange-800 text-xs" data-testid="badge-new-requests">
-                      {pendingRequests.length} New
-                    </Badge>
-                  </CardTitle>
-                </CardHeader>
-                
-                <CardContent className="p-0">
-                  <div className="divide-y divide-border">
-                    {pendingRequests.map((request: any) => (
-                      <div key={request.id} className="p-4 hover:bg-muted/50 transition-colors" data-testid={`request-${request.id}`}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4">
-                            <div className="flex-shrink-0 h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                              <span className="text-primary font-bold text-sm">
-                                {request.worker.name.split(' ').map((n: string) => n[0]).join('')}
-                              </span>
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2">
-                                <h4 className="text-sm font-medium text-foreground" data-testid={`request-worker-name-${request.id}`}>
-                                  {request.worker.name}
-                                </h4>
-                                <span className="text-xs text-muted-foreground font-mono" data-testid={`request-worker-id-${request.id}`}>
-                                  {request.worker.workerId}
-                                </span>
-                              </div>
-                              <p className="text-sm text-muted-foreground" data-testid={`request-company-${request.id}`}>
-                                {request.company.companyName}
-                              </p>
-                              <div className="flex items-center space-x-4 mt-1 text-xs text-muted-foreground">
-                                <span>Phone: <span data-testid={`request-worker-phone-${request.id}`}>{request.worker.phone}</span></span>
-                                <span>Requested: <span data-testid={`request-date-${request.id}`}>
-                                  {new Date(request.requestDate).toLocaleDateString()}
-                                </span></span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Button
-                              onClick={() => handleAssignRoom(request)}
-                              className="text-sm font-medium"
-                              data-testid={`button-assign-room-${request.id}`}
-                            >
-                              Assign Room
-                            </Button>
-                            <Button
-                              variant="outline"
-                              onClick={() => handleRejectRequest(request.id)}
-                              className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground text-sm font-medium"
-                              data-testid={`button-reject-${request.id}`}
-                            >
-                              Reject
-                            </Button>
-                          </div>
-                        </div>
+          {/* Content based on active view */}
+          {activeView === "rooms" && (
+            <>
+              {/* Stats Cards */}
+              <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Rooms</p>
+                        <p className="text-2xl font-bold text-foreground" data-testid="stat-total-rooms">
+                          {(stats as any)?.totalRooms || 0}
+                        </p>
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-          
-          {/* Current Occupants Section */}
-          <div className="px-6 pb-6">
+                      <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                        <Bed className="text-primary w-5 h-5" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Occupied</p>
+                        <p className="text-2xl font-bold text-green-600" data-testid="stat-occupied-rooms">
+                          {(stats as any)?.occupiedRooms || 0}
+                        </p>
+                      </div>
+                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                        <UserCheck className="text-green-600 w-5 h-5" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Pending Requests</p>
+                        <p className="text-2xl font-bold text-orange-600" data-testid="stat-pending-requests">
+                          {(stats as any)?.pendingRequests || 0}
+                        </p>
+                      </div>
+                      <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                        <Clock className="text-orange-600 w-5 h-5" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Available</p>
+                        <p className="text-2xl font-bold text-primary" data-testid="stat-available-rooms">
+                          {(stats as any)?.availableRooms || 0}
+                        </p>
+                      </div>
+                      <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                        <DoorOpen className="text-primary w-5 h-5" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              {/* Current Occupants Section for Room Management View */}
+              <div className="px-6 pb-6">
             <Card>
               <CardHeader>
                 <div className="flex justify-between items-center">
@@ -395,6 +345,89 @@ export default function HotelDashboard() {
               </CardContent>
             </Card>
           </div>
+            </>
+          )}
+
+          {/* Requests View */}
+          {activeView === "requests" && (
+            <div className="p-6">
+              {pendingRequests.length > 0 ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Inbox className="mr-2 text-orange-500 w-5 h-5" />
+                      Pending Worker Requests
+                      <Badge className="ml-2 bg-orange-100 text-orange-800 text-xs" data-testid="badge-new-requests">
+                        {pendingRequests.length} New
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  
+                  <CardContent className="p-0">
+                    <div className="divide-y divide-border">
+                      {pendingRequests.map((request: any) => (
+                        <div key={request.id} className="p-4 hover:bg-muted/50 transition-colors" data-testid={`request-${request.id}`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-4">
+                              <div className="flex-shrink-0 h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                                <span className="text-primary font-bold text-sm">
+                                  {request.worker.name.split(' ').map((n: string) => n[0]).join('')}
+                                </span>
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2">
+                                  <h4 className="text-sm font-medium text-foreground" data-testid={`request-worker-name-${request.id}`}>
+                                    {request.worker.name}
+                                  </h4>
+                                  <span className="text-xs text-muted-foreground font-mono" data-testid={`request-worker-id-${request.id}`}>
+                                    {request.worker.workerId}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-muted-foreground" data-testid={`request-company-${request.id}`}>
+                                  {request.company.companyName}
+                                </p>
+                                <div className="flex items-center space-x-4 mt-1 text-xs text-muted-foreground">
+                                  <span>Phone: <span data-testid={`request-worker-phone-${request.id}`}>{request.worker.phone}</span></span>
+                                  <span>Requested: <span data-testid={`request-date-${request.id}`}>
+                                    {new Date(request.requestDate).toLocaleDateString()}
+                                  </span></span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                onClick={() => handleAssignRoom(request)}
+                                className="text-sm font-medium"
+                                data-testid={`button-assign-room-${request.id}`}
+                              >
+                                Assign Room
+                              </Button>
+                              <Button
+                                variant="outline"
+                                onClick={() => handleRejectRequest(request.id)}
+                                className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground text-sm font-medium"
+                                data-testid={`button-reject-${request.id}`}
+                              >
+                                Reject
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardContent className="p-8 text-center">
+                    <Inbox className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium text-foreground mb-2">No Pending Requests</h3>
+                    <p className="text-muted-foreground">All accommodation requests have been processed.</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
