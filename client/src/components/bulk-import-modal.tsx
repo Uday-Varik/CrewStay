@@ -200,20 +200,25 @@ Mike Johnson,555-0103,60`;
   const bulkImportMutation = useMutation({
     mutationFn: async (workers: WorkerRowData[]) => {
       const response = await apiRequest('POST', '/api/workers/bulk', {
-        workers: workers.map(w => ({
+        workers: workers.map((w, index) => ({
           name: w.name,
           phone: w.phone,
+          idNumber: `BULK-${Date.now()}-${index + 1}`, // Generate unique ID for bulk import
           expectedDuration: parseInt(w.expectedDuration)
         }))
       });
-      return response;
+      return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/workers'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stats'] });
+      
+      const imported = data.imported || 0;
+      const errors = data.errors || 0;
+      
       toast({
         title: "Workers Imported",
-        description: `Successfully imported ${validWorkers.length} workers.`,
+        description: `Successfully imported ${imported} worker(s)${errors > 0 ? `. ${errors} failed.` : '.'}`,
       });
       onWorkersImported();
       onOpenChange(false);
