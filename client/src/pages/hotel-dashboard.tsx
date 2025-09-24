@@ -24,6 +24,11 @@ export default function HotelDashboard() {
     queryKey: ["/api/accommodation-requests"],
   });
 
+  // Fetch extension requests
+  const { data: extensions = [], isLoading: extensionsLoading, refetch: refetchExtensions } = useQuery({
+    queryKey: ["/api/extensions"],
+  });
+
   // Fetch statistics
   const { data: stats } = useQuery({
     queryKey: ["/api/stats"],
@@ -37,12 +42,14 @@ export default function HotelDashboard() {
       } else if (message.type === "worker_discontinued") {
         refetchRequests();
       } else if (message.type === "extension_request") {
-        refetchRequests();
+        refetchExtensions(); // Fix: refetch extensions, not requests
+      } else if (message.type === "extension_response") {
+        refetchExtensions();
       }
     },
   });
 
-  // Mutation for handling requests
+  // Mutation for handling accommodation requests
   const updateRequestMutation = useMutation({
     mutationFn: async ({ id, status, assignedRoom, notes }: { 
       id: string; 
@@ -63,6 +70,25 @@ export default function HotelDashboard() {
     },
   });
 
+  // Mutation for handling extension requests
+  const updateExtensionMutation = useMutation({
+    mutationFn: async ({ id, status, hotelResponse }: { 
+      id: string; 
+      status: "approved" | "rejected"; 
+      hotelResponse?: string; 
+    }) => {
+      const response = await apiRequest("PATCH", `/api/extensions/${id}`, {
+        status,
+        hotelResponse,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/extensions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+    },
+  });
+
   const handleAssignRoom = (request: any) => {
     setSelectedRequest(request);
     setShowAssignRoomModal(true);
@@ -77,8 +103,27 @@ export default function HotelDashboard() {
     }
   };
 
+  const handleApproveExtension = async (extensionId: string, hotelResponse?: string) => {
+    await updateExtensionMutation.mutateAsync({
+      id: extensionId,
+      status: "approved",
+      hotelResponse,
+    });
+  };
+
+  const handleRejectExtension = async (extensionId: string, hotelResponse?: string) => {
+    if (confirm("Are you sure you want to reject this extension request?")) {
+      await updateExtensionMutation.mutateAsync({
+        id: extensionId,
+        status: "rejected",
+        hotelResponse,
+      });
+    }
+  };
+
   const pendingRequests = requests.filter((req: any) => req.status === "pending");
   const approvedRequests = requests.filter((req: any) => req.status === "approved");
+  const pendingExtensions = extensions.filter((ext: any) => ext.status === "pending");
 
   const filteredApprovedRequests = approvedRequests.filter((request: any) =>
     request.worker.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -350,13 +395,14 @@ export default function HotelDashboard() {
 
           {/* Requests View */}
           {activeView === "requests" && (
-            <div className="p-6">
-              {pendingRequests.length > 0 ? (
+            <div className="p-6 space-y-6">
+              {/* Pending Accommodation Requests */}
+              {pendingRequests.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center">
                       <Inbox className="mr-2 text-orange-500 w-5 h-5" />
-                      Pending Worker Requests
+                      Pending Accommodation Requests
                       <Badge className="ml-2 bg-orange-100 text-orange-800 text-xs" data-testid="badge-new-requests">
                         {pendingRequests.length} New
                       </Badge>
@@ -417,12 +463,89 @@ export default function HotelDashboard() {
                     </div>
                   </CardContent>
                 </Card>
-              ) : (
+              )}
+
+              {/* Pending Extension Requests */}
+              {pendingExtensions.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Clock className="mr-2 text-blue-500 w-5 h-5" />
+                      Pending Extension Requests
+                      <Badge className="ml-2 bg-blue-100 text-blue-800 text-xs" data-testid="badge-extension-requests">
+                        {pendingExtensions.length} New
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  
+                  <CardContent className="p-0">
+                    <div className="divide-y divide-border">
+                      {pendingExtensions.map((extension: any) => (
+                        <div key={extension.id} className="p-4 hover:bg-muted/50 transition-colors" data-testid={`extension-${extension.id}`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-4">
+                              <div className="flex-shrink-0 h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <Clock className="text-blue-600 w-6 h-6" />
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2">
+                                  <h4 className="text-sm font-medium text-foreground" data-testid={`extension-worker-name-${extension.id}`}>
+                                    {extension.worker.name}
+                                  </h4>
+                                  <span className="text-xs text-muted-foreground font-mono" data-testid={`extension-worker-id-${extension.id}`}>
+                                    {extension.worker.workerId}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-muted-foreground" data-testid={`extension-company-${extension.id}`}>
+                                  {extension.worker.company?.companyName}
+                                </p>
+                                <div className="flex items-center space-x-4 mt-1 text-xs text-muted-foreground">
+                                  <span>Current End: <span data-testid={`extension-current-date-${extension.id}`}>
+                                    {new Date(extension.currentEndDate).toLocaleDateString()}
+                                  </span></span>
+                                  <span>Requested: <span data-testid={`extension-requested-date-${extension.id}`}>
+                                    {new Date(extension.requestedEndDate).toLocaleDateString()}
+                                  </span></span>
+                                </div>
+                                {extension.reason && (
+                                  <p className="text-sm text-muted-foreground mt-1" data-testid={`extension-reason-${extension.id}`}>
+                                    Reason: {extension.reason}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                onClick={() => handleApproveExtension(extension.id, "Extension approved by hotel")}
+                                className="text-sm font-medium bg-green-600 hover:bg-green-700"
+                                data-testid={`button-approve-extension-${extension.id}`}
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                variant="outline"
+                                onClick={() => handleRejectExtension(extension.id, "Extension rejected by hotel")}
+                                className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground text-sm font-medium"
+                                data-testid={`button-reject-extension-${extension.id}`}
+                              >
+                                Reject
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* No Requests Message */}
+              {pendingRequests.length === 0 && pendingExtensions.length === 0 && (
                 <Card>
                   <CardContent className="p-8 text-center">
                     <Inbox className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                     <h3 className="text-lg font-medium text-foreground mb-2">No Pending Requests</h3>
-                    <p className="text-muted-foreground">All accommodation requests have been processed.</p>
+                    <p className="text-muted-foreground">All accommodation and extension requests have been processed.</p>
                   </CardContent>
                 </Card>
               )}
