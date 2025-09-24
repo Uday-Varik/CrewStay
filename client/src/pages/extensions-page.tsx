@@ -44,14 +44,11 @@ export default function ExtensionsPage() {
   // Create extension mutation
   const createExtensionMutation = useMutation({
     mutationFn: async (data: ExtensionRequest & { workerId: string }) => {
-      const response = await apiRequest('/api/extensions', {
-        method: 'POST',
-        body: JSON.stringify({
-          workerId: data.workerId,
-          currentEndDate: selectedWorker?.expectedEndDate || new Date().toISOString(),
-          requestedEndDate: new Date(data.requestedEndDate).toISOString(),
-          reason: data.reason,
-        }),
+      const response = await apiRequest('POST', '/api/extensions', {
+        workerId: data.workerId,
+        currentEndDate: selectedWorker?.expectedEndDate || new Date().toISOString(),
+        requestedEndDate: new Date(data.requestedEndDate).toISOString(),
+        reason: data.reason,
       });
       return response;
     },
@@ -82,12 +79,9 @@ export default function ExtensionsPage() {
       status: "approved" | "rejected";
       hotelResponse?: string;
     }) => {
-      const response = await apiRequest(`/api/extensions/${extensionId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          status,
-          hotelResponse,
-        }),
+      const response = await apiRequest('PATCH', `/api/extensions/${extensionId}`, {
+        status,
+        hotelResponse,
       });
       return response;
     },
