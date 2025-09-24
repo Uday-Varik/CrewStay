@@ -145,9 +145,9 @@ export class DatabaseStorage implements IStorage {
         checkinDate: workers.checkinDate,
         expectedEndDate: workers.expectedEndDate,
         createdAt: workers.createdAt,
-        company: {
-          companyName: users.companyName,
-        },
+        company: sql<{ companyName: string }>`
+          json_build_object('companyName', COALESCE(users.company_name, ''))
+        `,
         assignedHotel: sql<{ companyName: string } | null>`
           CASE 
             WHEN ${workers.assignedHotelId} IS NOT NULL 
@@ -180,9 +180,9 @@ export class DatabaseStorage implements IStorage {
         checkinDate: workers.checkinDate,
         expectedEndDate: workers.expectedEndDate,
         createdAt: workers.createdAt,
-        company: {
-          companyName: users.companyName,
-        },
+        company: sql<{ companyName: string }>`
+          json_build_object('companyName', COALESCE(users.company_name, ''))
+        `,
         assignedHotel: sql<{ companyName: string } | null>`
           CASE 
             WHEN ${workers.assignedHotelId} IS NOT NULL 
@@ -267,14 +267,16 @@ export class DatabaseStorage implements IStorage {
         assignedRoom: accommodationRequests.assignedRoom,
         notes: accommodationRequests.notes,
         respondedAt: accommodationRequests.respondedAt,
-        worker: {
-          workerId: workers.workerId,
-          name: workers.name,
-          phone: workers.phone,
-        },
-        company: {
-          companyName: users.companyName,
-        },
+        worker: sql<{ workerId: string; name: string; phone: string }>`
+          json_build_object(
+            'workerId', COALESCE(workers.worker_id, ''),
+            'name', COALESCE(workers.name, ''),
+            'phone', COALESCE(workers.phone, '')
+          )
+        `,
+        company: sql<{ companyName: string }>`
+          json_build_object('companyName', COALESCE(users.company_name, ''))
+        `,
         hotel: sql<{ companyName: string } | null>`
           CASE 
             WHEN hotel.id IS NOT NULL 
@@ -303,14 +305,16 @@ export class DatabaseStorage implements IStorage {
         assignedRoom: accommodationRequests.assignedRoom,
         notes: accommodationRequests.notes,
         respondedAt: accommodationRequests.respondedAt,
-        worker: {
-          workerId: workers.workerId,
-          name: workers.name,
-          phone: workers.phone,
-        },
-        company: {
-          companyName: users.companyName,
-        },
+        worker: sql<{ workerId: string; name: string; phone: string }>`
+          json_build_object(
+            'workerId', COALESCE(workers.worker_id, ''),
+            'name', COALESCE(workers.name, ''),
+            'phone', COALESCE(workers.phone, '')
+          )
+        `,
+        company: sql<{ companyName: string }>`
+          json_build_object('companyName', COALESCE(users.company_name, ''))
+        `,
         hotel: sql<{ companyName: string } | null>`
           CASE 
             WHEN hotel.id IS NOT NULL 
@@ -388,18 +392,18 @@ export class DatabaseStorage implements IStorage {
         hotelResponse: extensions.hotelResponse,
         createdAt: extensions.createdAt,
         respondedAt: extensions.respondedAt,
-        worker: {
-          workerId: workers.workerId,
-          name: workers.name,
-          roomNumber: workers.roomNumber,
-          assignedHotel: sql<{ companyName: string } | null>`
-            CASE 
+        worker: sql<{ workerId: string; name: string; roomNumber: string; assignedHotel: { companyName: string } | null }>`
+          json_build_object(
+            'workerId', COALESCE(workers.worker_id, ''),
+            'name', COALESCE(workers.name, ''),
+            'roomNumber', COALESCE(workers.room_number, ''),
+            'assignedHotel', CASE 
               WHEN hotel.id IS NOT NULL 
               THEN json_build_object('companyName', hotel.company_name)
               ELSE NULL 
             END
-          `,
-        },
+          )
+        `,
       })
       .from(extensions)
       .leftJoin(workers, eq(extensions.workerId, workers.id))
@@ -420,18 +424,18 @@ export class DatabaseStorage implements IStorage {
         hotelResponse: extensions.hotelResponse,
         createdAt: extensions.createdAt,
         respondedAt: extensions.respondedAt,
-        worker: {
-          workerId: workers.workerId,
-          name: workers.name,
-          roomNumber: workers.roomNumber,
-          assignedHotel: sql<{ companyName: string } | null>`
-            CASE 
+        worker: sql<{ workerId: string; name: string; roomNumber: string; assignedHotel: { companyName: string } | null }>`
+          json_build_object(
+            'workerId', COALESCE(workers.worker_id, ''),
+            'name', COALESCE(workers.name, ''),
+            'roomNumber', COALESCE(workers.room_number, ''),
+            'assignedHotel', CASE 
               WHEN hotel.id IS NOT NULL 
               THEN json_build_object('companyName', hotel.company_name)
               ELSE NULL 
             END
-          `,
-        },
+          )
+        `,
       })
       .from(extensions)
       .leftJoin(workers, eq(extensions.workerId, workers.id))
@@ -520,7 +524,13 @@ export class DatabaseStorage implements IStorage {
     pendingRequests: number;
     availableRooms: number;
   }> {
-    // For this MVP, we'll use simple counts. In a real system, you'd have a rooms table
+    // Get hotel's total rooms from database
+    const [hotel] = await db
+      .select({ totalRooms: users.totalRooms })
+      .from(users)
+      .where(eq(users.id, hotelId))
+      .limit(1);
+
     const [occupiedRooms] = await db
       .select({ count: count() })
       .from(workers)
@@ -536,8 +546,7 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
-    // Assuming a hotel has 50 total rooms for this MVP
-    const totalRooms = 50;
+    const totalRooms = hotel?.totalRooms || 50; // Default to 50 if not set
     const occupied = occupiedRooms?.count || 0;
 
     return {

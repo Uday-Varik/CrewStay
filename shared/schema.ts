@@ -16,6 +16,7 @@ export const users = pgTable("users", {
   userType: userTypeEnum("user_type").notNull(),
   companyName: text("company_name").notNull(),
   contactInfo: text("contact_info"),
+  totalRooms: integer("total_rooms").default(50), // For hotels only
   createdAt: timestamp("created_at").defaultNow(),
 });
 
