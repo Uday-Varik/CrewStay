@@ -12,10 +12,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AddWorkerModal } from "@/components/add-worker-modal";
 import { BulkImportModal } from "@/components/bulk-import-modal";
 import { NotificationToast } from "@/components/notification-toast";
-import { Users, CheckCircle, Clock, CalendarPlus, Plus, Download, Search, Settings, LogOut, Bell, Upload } from "lucide-react";
+import { Users, CheckCircle, Clock, CalendarPlus, Plus, Download, Search, Upload } from "lucide-react";
 
 export default function ConstructionDashboard() {
-  const { user, logoutMutation } = useAuth();
+  const { user } = useAuth();
   const [showAddWorkerModal, setShowAddWorkerModal] = useState(false);
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -75,95 +75,46 @@ export default function ConstructionDashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="flex">
-        {/* Sidebar */}
-        <div className="w-64 bg-card border-r border-border h-screen sticky top-0">
-          <div className="p-6 border-b border-border">
-            <h2 className="text-xl font-bold text-primary">CrewStay</h2>
-            <p className="text-sm text-muted-foreground" data-testid="text-company-name">
-              {user?.companyName}
-            </p>
+    <div className="p-6 max-w-7xl mx-auto">
+      {/* Page Header */}
+      <div className="mb-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Worker Management</h1>
+            <p className="text-muted-foreground">Manage your construction crew accommodations</p>
           </div>
           
-          <nav className="p-4">
-            <ul className="space-y-2">
-              <li>
-                <div className="flex items-center space-x-3 px-3 py-2 rounded-md bg-accent text-accent-foreground">
-                  <Users className="w-5 h-5" />
-                  <span>Worker Management</span>
-                </div>
-              </li>
-              <li>
-                <Link href="/extensions">
-                  <div className="flex items-center space-x-3 px-3 py-2 rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors" data-testid="link-extensions">
-                    <Clock className="w-5 h-5" />
-                    <span>Extensions</span>
-                    {(stats as any)?.extensionsDue > 0 && (
-                      <Badge className="ml-auto bg-primary text-primary-foreground text-xs notification-badge" data-testid="badge-extensions-due">
-                        {(stats as any).extensionsDue}
-                      </Badge>
-                    )}
-                  </div>
-                </Link>
-              </li>
-            </ul>
-          </nav>
-          
-          <div className="absolute bottom-4 left-4 right-4">
+          <div className="flex items-center space-x-4">
+            {/* Real-time Status Indicator */}
+            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span>Live Updates Active</span>
+            </div>
+            
             <Button
-              variant="ghost"
-              className="w-full justify-start"
-              onClick={() => logoutMutation.mutate()}
-              data-testid="button-logout"
+              variant="outline"
+              onClick={() => setShowBulkImportModal(true)}
+              className="flex items-center space-x-2"
+              data-testid="button-bulk-import"
             >
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
+              <Upload className="w-4 h-4" />
+              <span>Bulk Import Workers</span>
+            </Button>
+            
+            <Button
+              onClick={() => setShowAddWorkerModal(true)}
+              className="flex items-center space-x-2"
+              data-testid="button-add-worker"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Worker</span>
             </Button>
           </div>
         </div>
-        
-        {/* Main Content */}
-        <div className="flex-1 overflow-auto">
-          {/* Header */}
-          <header className="bg-card border-b border-border p-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Worker Management</h1>
-                <p className="text-muted-foreground">Manage your construction crew accommodations</p>
-              </div>
-              
-              <div className="flex items-center space-x-4">
-                {/* Real-time Status Indicator */}
-                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <span>Live Updates Active</span>
-                </div>
-                
-                <Button
-                  variant="outline"
-                  onClick={() => setShowBulkImportModal(true)}
-                  className="flex items-center space-x-2"
-                  data-testid="button-bulk-import"
-                >
-                  <Upload className="w-4 h-4" />
-                  <span>Bulk Import Workers</span>
-                </Button>
-                
-                <Button
-                  onClick={() => setShowAddWorkerModal(true)}
-                  className="flex items-center space-x-2"
-                  data-testid="button-add-worker"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add Worker</span>
-                </Button>
-              </div>
-            </div>
-          </header>
+      </div>
           
-          {/* Stats Cards */}
-          <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
@@ -227,11 +178,10 @@ export default function ConstructionDashboard() {
                 </div>
               </CardContent>
             </Card>
-          </div>
-          
-          {/* Workers Table */}
-          <div className="p-6">
-            <Card>
+      </div>
+      
+      {/* Workers Table */}
+      <Card>
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <CardTitle>Worker List</CardTitle>
@@ -365,11 +315,8 @@ export default function ConstructionDashboard() {
                     </TableBody>
                   </Table>
                 )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Modals */}
       <AddWorkerModal

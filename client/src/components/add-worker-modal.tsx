@@ -43,7 +43,7 @@ export function AddWorkerModal({ open, onOpenChange, onWorkerAdded }: AddWorkerM
       idNumber: "",
       expectedDuration: 30,
       specialRequirements: "",
-      preferredHotelId: "",
+      preferredHotelId: "any",
     },
   });
 
@@ -171,7 +171,7 @@ export function AddWorkerModal({ open, onOpenChange, onWorkerAdded }: AddWorkerM
                   <SelectValue placeholder={hotelsLoading ? "Loading hotels..." : "Any Available Hotel"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="" data-testid="option-any-hotel">
+                  <SelectItem value="any" data-testid="option-any-hotel">
                     Any Available Hotel
                   </SelectItem>
                   {Array.isArray(hotels) && hotels.map((hotel) => (
