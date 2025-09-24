@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useWebSocket } from "@/hooks/use-websocket";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -85,15 +86,17 @@ export default function ConstructionDashboard() {
                 </div>
               </li>
               <li>
-                <div className="flex items-center space-x-3 px-3 py-2 rounded-md text-muted-foreground">
-                  <Clock className="w-5 h-5" />
-                  <span>Extensions</span>
-                  {stats?.extensionsDue > 0 && (
-                    <Badge className="ml-auto bg-primary text-primary-foreground text-xs notification-badge" data-testid="badge-extensions-due">
-                      {stats.extensionsDue}
-                    </Badge>
-                  )}
-                </div>
+                <Link href="/extensions">
+                  <div className="flex items-center space-x-3 px-3 py-2 rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors" data-testid="link-extensions">
+                    <Clock className="w-5 h-5" />
+                    <span>Extensions</span>
+                    {stats?.extensionsDue > 0 && (
+                      <Badge className="ml-auto bg-primary text-primary-foreground text-xs notification-badge" data-testid="badge-extensions-due">
+                        {stats.extensionsDue}
+                      </Badge>
+                    )}
+                  </div>
+                </Link>
               </li>
             </ul>
           </nav>
