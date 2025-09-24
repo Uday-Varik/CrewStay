@@ -17,16 +17,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const workerData = insertWorkerSchema.parse(req.body);
+      const { preferredHotel, ...workerFields } = req.body;
+      const workerData = insertWorkerSchema.parse(workerFields);
       const worker = await storage.createWorker({
         ...workerData,
         companyId: req.user!.id,
       });
 
-      // Create accommodation request
+      // Create accommodation request - for MVP, set hotelId to null for general requests
       const request = await storage.createAccommodationRequest({
         workerId: worker.id,
         companyId: req.user!.id,
+        hotelId: null, // For MVP, accommodation requests are general and hotels can claim them
+        notes: `Accommodation request for ${worker.name}. Preferred hotel: ${preferredHotel || 'Any available hotel'}`,
       });
 
       // Notify hotels via WebSocket
@@ -97,6 +100,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Accommodation request routes
+  app.post("/api/accommodation-requests", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || req.user!.userType !== "construction") {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { workerId, preferredHotel, notes } = req.body;
+      
+      if (!workerId) {
+        return res.status(400).json({ message: "Worker ID is required" });
+      }
+
+      // Verify worker exists and belongs to requesting company
+      const worker = await storage.getWorkerById(workerId);
+      if (!worker || worker.companyId !== req.user!.id) {
+        return res.status(404).json({ message: "Worker not found or access denied" });
+      }
+
+      const request = await storage.createAccommodationRequest({
+        workerId,
+        companyId: req.user!.id,
+        hotelId: null, // For MVP, requests are general and hotels can claim them
+        notes: notes || `Accommodation request. Preferred hotel: ${preferredHotel || 'Any available hotel'}`,
+      });
+
+      // Notify hotels via WebSocket
+      broadcastToUserType("hotel", {
+        type: "new_worker_request",
+        data: { request },
+      });
+
+      res.status(201).json(request);
+    } catch (error) {
+      res.status(400).json({ message: error instanceof Error ? error.message : "Invalid data" });
+    }
+  });
+
   app.get("/api/accommodation-requests", async (req, res) => {
     try {
       if (!req.isAuthenticated()) {
@@ -128,13 +168,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Room assignment required for approval" });
       }
 
-      await storage.updateRequestStatus(
+      // Use atomic update with proper state and ownership checking
+      const success = await storage.updateRequestStatusAtomic(
         req.params.id,
         status,
-        status === "approved" ? req.user!.id : undefined,
+        req.user!.id,
         assignedRoom,
         notes
       );
+
+      if (!success) {
+        return res.status(409).json({ message: "Request cannot be updated - already processed or not available to this hotel" });
+      }
 
       // If approved, update worker assignment
       if (status === "approved") {

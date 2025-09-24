@@ -27,6 +27,7 @@ export interface IStorage {
   getRequestsByHotel(hotelId: string): Promise<AccommodationRequestWithDetails[]>;
   getRequestsByCompany(companyId: string): Promise<AccommodationRequestWithDetails[]>;
   updateRequestStatus(id: string, status: "approved" | "rejected", hotelId?: string, assignedRoom?: string, notes?: string): Promise<void>;
+  updateRequestStatusAtomic(id: string, status: "approved" | "rejected", hotelId: string, assignedRoom?: string, notes?: string): Promise<boolean>;
   
   // Extensions
   createExtension(extension: InsertExtension): Promise<Extension>;
@@ -259,7 +260,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(workers, eq(accommodationRequests.workerId, workers.id))
       .leftJoin(users, eq(accommodationRequests.companyId, users.id))
       .leftJoin(sql`${users} as hotel`, sql`${accommodationRequests.hotelId} = hotel.id`)
-      .where(eq(accommodationRequests.hotelId, hotelId))
+      .where(sql`${accommodationRequests.hotelId} = ${hotelId} OR ${accommodationRequests.hotelId} IS NULL`)
       .orderBy(desc(accommodationRequests.requestDate));
   }
 
@@ -310,6 +311,34 @@ export class DatabaseStorage implements IStorage {
         respondedAt: new Date(),
       })
       .where(eq(accommodationRequests.id, id));
+  }
+
+  async updateRequestStatusAtomic(id: string, status: "approved" | "rejected", hotelId: string, assignedRoom?: string, notes?: string): Promise<boolean> {
+    try {
+      const result = await db
+        .update(accommodationRequests)
+        .set({ 
+          status,
+          hotelId,
+          assignedRoom,
+          notes,
+          respondedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(accommodationRequests.id, id),
+            eq(accommodationRequests.status, "pending"),
+            sql`(${accommodationRequests.hotelId} IS NULL OR ${accommodationRequests.hotelId} = ${hotelId})`
+          )
+        )
+        .returning({ id: accommodationRequests.id });
+      
+      // Check if any rows were updated by checking if we got a result back
+      return result.length > 0;
+    } catch (error) {
+      console.error("Error in updateRequestStatusAtomic:", error);
+      return false;
+    }
   }
 
   async createExtension(extension: InsertExtension): Promise<Extension> {
@@ -448,7 +477,12 @@ export class DatabaseStorage implements IStorage {
     const [pendingRequests] = await db
       .select({ count: count() })
       .from(accommodationRequests)
-      .where(and(eq(accommodationRequests.hotelId, hotelId), eq(accommodationRequests.status, "pending")));
+      .where(
+        and(
+          sql`(${accommodationRequests.hotelId} IS NULL OR ${accommodationRequests.hotelId} = ${hotelId})`,
+          eq(accommodationRequests.status, "pending")
+        )
+      );
 
     // Assuming a hotel has 50 total rooms for this MVP
     const totalRooms = 50;
