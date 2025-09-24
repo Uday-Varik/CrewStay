@@ -24,6 +24,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         companyId: req.user!.id,
       });
 
+      // Update worker status to pending assignment
+      await storage.updateWorkerStatus(worker.id, "pending_assignment");
+
       // Create accommodation request - for MVP, set hotelId to null for general requests
       const request = await storage.createAccommodationRequest({
         workerId: worker.id,
@@ -70,6 +73,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ...workerData,
             companyId: req.user!.id,
           });
+
+          // Update worker status to pending assignment
+          await storage.updateWorkerStatus(worker.id, "pending_assignment");
 
           // Create accommodation request for each worker
           const request = await storage.createAccommodationRequest({
@@ -257,6 +263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const approvedRequest = request.find(r => r.id === req.params.id);
         
         if (approvedRequest) {
+          // Update worker assignment and status (automatically sets to "room_assigned")
           await storage.updateWorkerAssignment(
             approvedRequest.workerId,
             req.user!.id,
@@ -290,6 +297,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const extensionData = insertExtensionSchema.parse(req.body);
       const extension = await storage.createExtension(extensionData);
+
+      // Update worker status to extension requested
+      await storage.updateWorkerForExtensionRequest(extensionData.workerId);
 
       // Get worker details for notification
       const worker = await storage.getWorkerById(extensionData.workerId);
@@ -348,6 +358,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       await storage.updateExtensionStatus(req.params.id, status, hotelResponse);
+
+      // Update worker status based on extension result
+      if (status === "approved") {
+        await storage.updateWorkerForExtensionApproval(extension.workerId, extension.requestedEndDate);
+      } else if (status === "rejected") {
+        // If extension rejected, worker goes back to checked_in status
+        await storage.updateWorkerStatus(extension.workerId, "checked_in");
+      }
 
       // Notify construction company
       if (extension) {

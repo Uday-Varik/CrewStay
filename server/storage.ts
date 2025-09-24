@@ -18,8 +18,12 @@ export interface IStorage {
   createWorker(worker: InsertWorker & { companyId: string }): Promise<Worker>;
   getWorkersByCompany(companyId: string): Promise<WorkerWithDetails[]>;
   getWorkerById(id: string): Promise<WorkerWithDetails | undefined>;
-  updateWorkerStatus(id: string, status: "active" | "inactive" | "pending"): Promise<void>;
+  updateWorkerStatus(id: string, status: "pending" | "pending_assignment" | "room_assigned" | "checked_in" | "extension_requested" | "extension_approved" | "checkout_pending" | "checked_out" | "inactive"): Promise<void>;
   updateWorkerAssignment(id: string, hotelId: string, roomNumber: string): Promise<void>;
+  updateWorkerCheckIn(id: string): Promise<void>;
+  updateWorkerForExtensionRequest(id: string): Promise<void>;
+  updateWorkerForExtensionApproval(id: string, newEndDate: Date): Promise<void>;
+  updateWorkerCheckOut(id: string): Promise<void>;
   getNextWorkerNumber(companyId: string): Promise<number>;
   exportWorkersCSV(companyId: string): Promise<string>;
   
@@ -204,7 +208,7 @@ export class DatabaseStorage implements IStorage {
     return worker || undefined;
   }
 
-  async updateWorkerStatus(id: string, status: "active" | "inactive" | "pending"): Promise<void> {
+  async updateWorkerStatus(id: string, status: "pending" | "pending_assignment" | "room_assigned" | "checked_in" | "extension_requested" | "extension_approved" | "checkout_pending" | "checked_out" | "inactive"): Promise<void> {
     await db
       .update(workers)
       .set({ status })
@@ -217,8 +221,45 @@ export class DatabaseStorage implements IStorage {
       .set({ 
         assignedHotelId: hotelId,
         roomNumber,
-        status: "active",
+        status: "room_assigned", // Room assigned but not checked in yet
+      })
+      .where(eq(workers.id, id));
+  }
+
+  async updateWorkerCheckIn(id: string): Promise<void> {
+    await db
+      .update(workers)
+      .set({ 
+        status: "checked_in",
         checkinDate: new Date(),
+      })
+      .where(eq(workers.id, id));
+  }
+
+  async updateWorkerForExtensionRequest(id: string): Promise<void> {
+    await db
+      .update(workers)
+      .set({ status: "extension_requested" })
+      .where(eq(workers.id, id));
+  }
+
+  async updateWorkerForExtensionApproval(id: string, newEndDate: Date): Promise<void> {
+    await db
+      .update(workers)
+      .set({ 
+        status: "extension_approved",
+        expectedEndDate: newEndDate,
+      })
+      .where(eq(workers.id, id));
+  }
+
+  async updateWorkerCheckOut(id: string): Promise<void> {
+    await db
+      .update(workers)
+      .set({ 
+        status: "checked_out",
+        roomNumber: null,
+        assignedHotelId: null,
       })
       .where(eq(workers.id, id));
   }
@@ -502,12 +543,14 @@ export class DatabaseStorage implements IStorage {
     const [activeWorkers] = await db
       .select({ count: count() })
       .from(workers)
-      .where(and(eq(workers.companyId, companyId), eq(workers.status, "active")));
+      .where(and(eq(workers.companyId, companyId), 
+        sql`${workers.status} IN ('checked_in', 'extension_requested', 'extension_approved')`));
 
     const [pendingAssignments] = await db
       .select({ count: count() })
       .from(workers)
-      .where(and(eq(workers.companyId, companyId), eq(workers.status, "pending")));
+      .where(and(eq(workers.companyId, companyId), 
+        sql`${workers.status} IN ('pending', 'pending_assignment')`));
 
     const [extensionsDue] = await db
       .select({ count: count() })
@@ -539,7 +582,8 @@ export class DatabaseStorage implements IStorage {
     const [occupiedRooms] = await db
       .select({ count: count() })
       .from(workers)
-      .where(and(eq(workers.assignedHotelId, hotelId), eq(workers.status, "active")));
+      .where(and(eq(workers.assignedHotelId, hotelId), 
+        sql`${workers.status} IN ('room_assigned', 'checked_in', 'extension_requested', 'extension_approved')`));
 
     const [pendingRequests] = await db
       .select({ count: count() })

@@ -5,7 +5,17 @@ import { z } from "zod";
 import { relations } from "drizzle-orm";
 
 export const userTypeEnum = pgEnum("user_type", ["construction", "hotel"]);
-export const workerStatusEnum = pgEnum("worker_status", ["active", "inactive", "pending"]);
+export const workerStatusEnum = pgEnum("worker_status", [
+  "pending", // Worker added but no accommodation request sent yet
+  "pending_assignment", // Accommodation request sent, waiting for hotel response
+  "room_assigned", // Hotel approved and assigned room, worker not checked in yet
+  "checked_in", // Worker has checked into the hotel
+  "extension_requested", // Worker requested stay extension
+  "extension_approved", // Extension approved, stay extended
+  "checkout_pending", // Worker scheduled to checkout soon
+  "checked_out", // Worker has completed stay
+  "inactive" // Worker no longer with company
+]);
 export const requestStatusEnum = pgEnum("request_status", ["pending", "approved", "rejected"]);
 export const extensionStatusEnum = pgEnum("extension_status", ["pending", "approved", "rejected"]);
 
