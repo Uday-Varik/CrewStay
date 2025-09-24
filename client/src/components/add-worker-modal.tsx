@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,10 +12,10 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { insertWorkerSchema } from "@shared/schema";
 import { z } from "zod";
-import { Info } from "lucide-react";
+import { Info, Loader2 } from "lucide-react";
 
 const addWorkerSchema = insertWorkerSchema.extend({
-  preferredHotel: z.string().optional(),
+  preferredHotelId: z.string().optional(),
 });
 
 type AddWorkerForm = z.infer<typeof addWorkerSchema>;
@@ -29,6 +29,12 @@ interface AddWorkerModalProps {
 export function AddWorkerModal({ open, onOpenChange, onWorkerAdded }: AddWorkerModalProps) {
   const { toast } = useToast();
   
+  // Fetch all hotels for the dropdown
+  const { data: hotels = [], isLoading: hotelsLoading } = useQuery<any[]>({
+    queryKey: ["/api/hotels"],
+    enabled: open, // Only fetch when modal is open
+  });
+  
   const form = useForm<AddWorkerForm>({
     resolver: zodResolver(addWorkerSchema),
     defaultValues: {
@@ -37,13 +43,15 @@ export function AddWorkerModal({ open, onOpenChange, onWorkerAdded }: AddWorkerM
       idNumber: "",
       expectedDuration: 30,
       specialRequirements: "",
-      preferredHotel: "",
+      preferredHotelId: "",
     },
   });
 
   const addWorkerMutation = useMutation({
     mutationFn: async (data: AddWorkerForm) => {
-      const { preferredHotel, ...workerData } = data;
+      const { preferredHotelId, ...workerData } = data;
+      // If a preferred hotel is selected, we could potentially use it for automatic assignment
+      // For now, we'll just create the worker and let the normal request flow handle hotel assignment
       const response = await apiRequest("POST", "/api/workers", workerData);
       return response.json();
     },
@@ -152,19 +160,28 @@ export function AddWorkerModal({ open, onOpenChange, onWorkerAdded }: AddWorkerM
             <div>
               <Label htmlFor="preferredHotel">Preferred Hotel</Label>
               <Select
-                value={form.watch("preferredHotel")}
-                onValueChange={(value) => form.setValue("preferredHotel", value)}
+                value={form.watch("preferredHotelId")}
+                onValueChange={(value) => form.setValue("preferredHotelId", value)}
+                disabled={hotelsLoading}
               >
                 <SelectTrigger data-testid="select-preferred-hotel">
-                  <SelectValue placeholder="Any Available Hotel" />
+                  <SelectValue placeholder={hotelsLoading ? "Loading hotels..." : "Any Available Hotel"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="any">Any Available Hotel</SelectItem>
-                  <SelectItem value="paradise">Paradise Hotel</SelectItem>
-                  <SelectItem value="comfort">Comfort Inn</SelectItem>
-                  <SelectItem value="business">Business Lodge</SelectItem>
+                  <SelectItem value="">Any Available Hotel</SelectItem>
+                  {hotels.map((hotel) => (
+                    <SelectItem key={hotel.id} value={hotel.id}>
+                      {hotel.companyName}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              {hotelsLoading && (
+                <div className="flex items-center text-sm text-muted-foreground mt-1">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading available hotels...
+                </div>
+              )}
             </div>
           </div>
           

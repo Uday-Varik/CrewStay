@@ -391,6 +391,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/hotels", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const hotels = await storage.getAllHotels();
+      // Remove password from response
+      const safeHotels = hotels.map(({ password, ...hotel }) => hotel);
+      res.json(safeHotels);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch hotels" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket setup for real-time updates

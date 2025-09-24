@@ -12,6 +12,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  getAllHotels(): Promise<User[]>;
   
   // Worker management
   createWorker(worker: InsertWorker & { companyId: string }): Promise<Worker>;
@@ -79,6 +80,10 @@ export class DatabaseStorage implements IStorage {
       .values(insertUser)
       .returning();
     return user;
+  }
+
+  async getAllHotels(): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.userType, "hotel"));
   }
 
   async createWorker(worker: InsertWorker & { companyId: string }): Promise<Worker> {
