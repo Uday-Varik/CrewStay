@@ -9,12 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AddWorkerModal } from "@/components/add-worker-modal";
+import { BulkImportModal } from "@/components/bulk-import-modal";
 import { NotificationToast } from "@/components/notification-toast";
-import { Users, CheckCircle, Clock, CalendarPlus, Plus, Download, Search, Settings, LogOut, Bell } from "lucide-react";
+import { Users, CheckCircle, Clock, CalendarPlus, Plus, Download, Search, Settings, LogOut, Bell, Upload } from "lucide-react";
 
 export default function ConstructionDashboard() {
   const { user, logoutMutation } = useAuth();
   const [showAddWorkerModal, setShowAddWorkerModal] = useState(false);
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   // Fetch workers
@@ -130,6 +132,16 @@ export default function ConstructionDashboard() {
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                   <span>Live Updates Active</span>
                 </div>
+                
+                <Button
+                  variant="outline"
+                  onClick={() => setShowBulkImportModal(true)}
+                  className="flex items-center space-x-2"
+                  data-testid="button-bulk-import"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>Bulk Import Workers</span>
+                </Button>
                 
                 <Button
                   onClick={() => setShowAddWorkerModal(true)}
@@ -373,6 +385,15 @@ export default function ConstructionDashboard() {
         onWorkerAdded={() => {
           refetchWorkers();
           setShowAddWorkerModal(false);
+        }}
+      />
+
+      <BulkImportModal
+        open={showBulkImportModal}
+        onOpenChange={setShowBulkImportModal}
+        onWorkersImported={() => {
+          refetchWorkers();
+          setShowBulkImportModal(false);
         }}
       />
 

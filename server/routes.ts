@@ -44,6 +44,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk worker import endpoint
+  app.post("/api/workers/bulk", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || req.user!.userType !== "construction") {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const bulkWorkerSchema = z.object({
+        workers: z.array(insertWorkerSchema.omit({ companyId: true })).min(1).max(1000)
+      });
+
+      const { workers: workersData } = bulkWorkerSchema.parse(req.body);
+
+      const results = [];
+      const errors = [];
+      
+      // Process workers in batch
+      for (let i = 0; i < workersData.length; i++) {
+        try {
+          const workerData = workersData[i];
+          
+          // Create worker
+          const worker = await storage.createWorker({
+            ...workerData,
+            companyId: req.user!.id,
+          });
+
+          // Create accommodation request for each worker
+          const request = await storage.createAccommodationRequest({
+            workerId: worker.id,
+            companyId: req.user!.id,
+            hotelId: null,
+            notes: `Accommodation request for ${worker.name} (bulk import)`,
+          });
+
+          results.push({ worker, request });
+        } catch (error) {
+          errors.push({ 
+            index: i, 
+            name: workersData[i]?.name || `Worker ${i + 1}`,
+            error: error instanceof Error ? error.message : "Unknown error" 
+          });
+        }
+      }
+
+      // Notify hotels via WebSocket about all new workers
+      if (results.length > 0) {
+        broadcastToUserType("hotel", {
+          type: "bulk_worker_requests",
+          data: { 
+            workers: results.map(r => r.worker), 
+            requests: results.map(r => r.request),
+            companyName: req.user!.companyName 
+          },
+        });
+      }
+
+      res.status(201).json({
+        message: `Successfully imported ${results.length} workers`,
+        imported: results.length,
+        errors: errors.length,
+        details: errors.length > 0 ? errors : undefined
+      });
+    } catch (error) {
+      res.status(400).json({ 
+        message: error instanceof Error ? error.message : "Invalid bulk import data" 
+      });
+    }
+  });
+
   app.get("/api/workers", async (req, res) => {
     try {
       if (!req.isAuthenticated() || req.user!.userType !== "construction") {
