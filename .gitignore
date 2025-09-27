@@ -1,6 +1,20 @@
+# node_modules
+# dist
+# .DS_Store
+# server/public
+# vite.config.ts.*
+# *.tar.gz
+
+# dependencies
 node_modules
+.upm
+
+# build
 dist
-.DS_Store
-server/public
-vite.config.ts.*
-*.tar.gz
+
+# env
+.env
+
+# replit junk
+.local/
+.replit
